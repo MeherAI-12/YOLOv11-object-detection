@@ -4,52 +4,69 @@ from PIL import Image
 import numpy as np
 import cv2
 
-# -------------------- PAGE CONFIG --------------------
+# -------------------- CONFIG --------------------
 st.set_page_config(
     page_title="YOLO Object Detection",
-    page_icon="🤖",
+    page_icon="🎯",
     layout="centered"
 )
 
-# -------------------- TITLE --------------------
-st.title("🤖 YOLO Object Detection App")
-st.caption("Upload an image and get accurate object detection results")
+st.title("🎯 YOLO Object Detection")
+st.caption("Reliable & stable Streamlit deployment")
 
 # -------------------- LOAD MODEL --------------------
 @st.cache_resource
 def load_model():
-    return YOLO("yolo11n.pt")
+    return YOLO("yolov8n.pt")   # ✅ STABLE MODEL
 
 model = load_model()
 
 # -------------------- SIDEBAR --------------------
-st.sidebar.header("⚙️ Detection Settings")
-conf_threshold = st.sidebar.slider(
+st.sidebar.header("⚙️ Settings")
+conf = st.sidebar.slider(
     "Confidence Threshold",
-    min_value=0.1,
-    max_value=1.0,
-    value=0.5,
-    step=0.05
+    0.1, 1.0, 0.5, 0.05
 )
 
 # -------------------- IMAGE UPLOAD --------------------
 uploaded_file = st.file_uploader(
-    "📤 Upload an image",
+    "📤 Upload an Image",
     type=["jpg", "jpeg", "png", "webp"]
 )
 
-if uploaded_file is not None:
-    # Read image correctly
+if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
-    image_np = np.array(image)
+    img_np = np.array(image)
 
-    # Show original image
-    st.subheader("🖼️ Original Image")
+    st.subheader("🖼 Original Image")
     st.image(image, use_container_width=True)
 
-    # Run detection
-    if st.button("🚀 Run Detection"):
-        with st.spinner("Detecting objects..."):
-            results = model(image_np, conf=conf_threshold)
+    st.subheader("📌 Detection Result")
 
-            # Plot result (BGR → RGB conv
+    with st.spinner("Running YOLO detection..."):
+        results = model.predict(
+            source=img_np,
+            conf=conf,
+            save=False,
+            verbose=False
+        )
+
+        annotated_bgr = results[0].plot()
+        annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
+
+    st.image(annotated_rgb, use_container_width=True)
+
+    # Detection summary
+    boxes = results[0].boxes
+    count = 0 if boxes is None else len(boxes)
+
+    st.success(f"✅ Objects detected: {count}")
+
+    if count > 0:
+        class_ids = boxes.cls.cpu().numpy()
+        class_names = [results[0].names[int(i)] for i in class_ids]
+        st.write("### 🏷 Detected Classes")
+        st.write(class_names)
+
+else:
+    st.info("👆 Upload an image to start detection")
